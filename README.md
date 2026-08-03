@@ -1,5 +1,9 @@
+<h1 align="center">🔭 UNS Sentinel Explorer</h1>
+
 <p align="center">
-  <img src="https://img.shields.io/badge/UNS%20Sentinel%20Explorer-MQTT%20Dashboard-22d3ee?style=for-the-badge&logo=apache-mqtt&logoColor=white" alt="UNS Sentinel Explorer" />
+  <strong>UNS Sentinel Explorer is an open-source, web-based dashboard built for Unified Namespace architectures.</strong><br/>
+  It features an ISA-95 hierarchical topic tree, multi-broker tab management, and dynamic auto-discovery for legacy topics.<br/>
+  Effortlessly inspect real-time JSON payload diffs, plot live telemetry graphs, and publish custom MQTT data streams.
 </p>
 
 <p align="center">
@@ -40,13 +44,6 @@
   <img src="https://img.shields.io/badge/ISA--95-Hierarchical-22d3ee?style=flat-square" alt="ISA-95" />
 </p>
 
-<h1 align="center">🔭 UNS Sentinel Explorer</h1>
-
-<p align="center">
-  <strong>UNS Sentinel Explorer is an open-source, web-based dashboard built for Unified Namespace architectures.</strong><br/>
-  It features an ISA-95 hierarchical topic tree, multi-broker tab management, and dynamic auto-discovery for legacy topics.<br/>
-  Effortlessly inspect real-time JSON payload diffs, plot live telemetry graphs, and publish custom MQTT data streams.
-</p>
 
 <p align="center">
   <strong>Created & maintained by <a href="https://github.com/nimish-nirmal">Nimish Nirmal</a></strong>
