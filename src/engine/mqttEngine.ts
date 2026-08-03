@@ -32,6 +32,8 @@ export interface MqttEngineCallbacks {
   onBatch: (sessionId: string, batch: MessageBatch[]) => void;
   onStatus: (sessionId: string, status: SessionStatus, message?: string) => void;
   onStatsTick: (sessionId: string, stats: SessionStats) => void;
+  /** Called when the backend gateway is unreachable (e.g. static hosting / GitHub Pages) */
+  onGatewayUnavailable?: () => void;
 }
 
 export class MqttEngine {
@@ -44,6 +46,9 @@ export class MqttEngine {
   private destroyed = false;
   private socket: Socket | null = null;
   private connectingBrokers = new Set<string>(); // Track brokers being connected to prevent duplicates
+  private gatewayFailures = 0;
+  private gatewayUnavailableNotified = false;
+  private static readonly GATEWAY_FAILURE_THRESHOLD = 3;
 
   constructor(callbacks: MqttEngineCallbacks) {
     this.callbacks = callbacks;
@@ -81,6 +86,16 @@ export class MqttEngine {
       if (this.destroyed) return;
       console.error('[Gateway] Socket.io connection error:', err.message);
       console.error('[Gateway] Error details:', err);
+
+      // After several consecutive failures, the gateway is likely unreachable
+      // (e.g. static hosting on GitHub Pages with no backend). Notify the app
+      // so it can fall back to the Demo Simulator.
+      this.gatewayFailures++;
+      if (!this.gatewayUnavailableNotified && this.gatewayFailures >= MqttEngine.GATEWAY_FAILURE_THRESHOLD) {
+        this.gatewayUnavailableNotified = true;
+        console.warn('[Gateway] Backend gateway unreachable — falling back to Demo Simulator mode');
+        this.callbacks.onGatewayUnavailable?.();
+      }
     });
 
     // Listen for MQTT messages from backend

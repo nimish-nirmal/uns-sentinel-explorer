@@ -53,10 +53,14 @@
 </p>
 
 <p align="center">
-  <a href="https://nimish-nirmal.github.io/uns-sentinel-explorer/" target="_blank">
-    <kbd>🚀 Launch the Live Demo</kbd>
+  <a href="https://nimish-nirmal.github.io/uns-sentinel-explorer/" target="_blank" style="text-decoration: none;">
+    <img src="https://img.shields.io/badge/🚀_Launch_Live_Demo-Click_Here-22d3ee?style=for-the-badge&logo=github&logoColor=white" alt="Launch Live Demo" />
   </a>
 </p>
+
+> **💡 Note:** The Live Demo runs on **GitHub Pages (static hosting)** — it cannot run the Node.js backend gateway because GitHub Pages only serves static files (no server-side processes). The demo **automatically falls back to the built-in Demo Simulator**, so you can explore the full dashboard with realistic telemetry without any backend.
+>
+> To use **real MQTT broker connections**, run the app locally with `npm run dev:all` (starts both the frontend and the backend gateway).
 
 ---
 

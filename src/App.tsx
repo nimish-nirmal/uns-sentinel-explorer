@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlaskConical, Loader2, Pause, Play, BookOpen, Github } from 'lucide-react';
+import { FlaskConical, Loader2, Pause, Play, BookOpen, Github, AlertTriangle, X } from 'lucide-react';
 import type { BrokerConfig, Session, SessionStatus, UNSTreeNode, SavedBroker } from './types';
 import { MqttEngine, type MessageBatch, decodePayload, generateSessionId } from './engine/mqttEngine';
 import { startSimulator, type SimulatorControl } from './engine/simulator';
@@ -28,9 +28,12 @@ export default function App() {
   const [selectedNode, setSelectedNode] = useState<UNSTreeNode | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [selectedTelemetryKeys, setSelectedTelemetryKeys] = useState<Set<string>>(new Set());
+  const [showGatewayWarning, setShowGatewayWarning] = useState(false);
 
   const engineRef = useRef<MqttEngine | null>(null);
   const simControlRef = useRef<SimulatorControl | null>(null);
+  const isSimulatingRef = useRef(false);
+  const toggleSimulatorRef = useRef<() => void>(() => {});
   const [isPaused, setIsPaused] = useState(false);
 
   const applyMessageBatch = useCallback((sessionId: string, batch: MessageBatch[]) => {
@@ -66,7 +69,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const engine = new MqttEngine({ onBatch: applyMessageBatch, onStatus: handleStatus, onStatsTick: handleStatsTick });
+    const engine = new MqttEngine({
+      onBatch: applyMessageBatch,
+      onStatus: handleStatus,
+      onStatsTick: handleStatsTick,
+      // When the backend gateway is unreachable (e.g. static GitHub Pages demo),
+      // automatically launch the Demo Simulator so the app is fully functional.
+      onGatewayUnavailable: () => {
+        console.log('[App] Gateway unavailable — auto-launching Demo Simulator');
+        // Show warning popup
+        setShowGatewayWarning(true);
+        // Use a small delay to let the engine settle before starting the simulator
+        setTimeout(() => {
+          if (!isSimulatingRef.current) {
+            toggleSimulatorRef.current();
+          }
+        }, 100);
+      },
+    });
     engineRef.current = engine;
     setSavedBrokers(loadSavedBrokers());
     
@@ -153,6 +173,7 @@ export default function App() {
       if (simControlRef.current) simControlRef.current.stop();
       simControlRef.current = null;
       setIsSimulating(false);
+      isSimulatingRef.current = false;
       setIsPaused(false);
       return;
     }
@@ -205,7 +226,13 @@ export default function App() {
       1500
     );
     setIsSimulating(true);
+    isSimulatingRef.current = true;
   }, [isSimulating, applyMessageBatch]);
+
+  // Keep refs in sync for the gateway-unavailable auto-fallback
+  useEffect(() => {
+    toggleSimulatorRef.current = toggleSimulator;
+  }, [toggleSimulator]);
 
   const handleTogglePause = useCallback(() => {
     setIsPaused((prev) => {
@@ -441,6 +468,50 @@ export default function App() {
         open={showActiveSessionsModal}
         onClose={() => setShowActiveSessionsModal(false)}
       />
+
+      {/* Gateway unavailable warning popup */}
+      {showGatewayWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="panel w-[420px] animate-fade-in">
+            <div className="panel-header">
+              <span className="flex items-center gap-2 text-amber-400">
+                <AlertTriangle className="w-4 h-4" />
+                Gateway Not Connected
+              </span>
+              <button
+                onClick={() => setShowGatewayWarning(false)}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-slate-300">
+                The backend gateway is <strong className="text-amber-400">not reachable</strong>.
+                This usually happens on <strong>static hosting</strong> (like GitHub Pages)
+                where no Node.js server can run.
+              </p>
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-300">
+                <strong>Only Demo Simulator mode will work.</strong>
+                <br />
+                Real MQTT broker connections require the backend gateway.
+              </div>
+              <p className="text-xs text-slate-500">
+                To use real MQTT brokers, run locally with{' '}
+                <code className="text-cyan-400">npm run dev:all</code>.
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setShowGatewayWarning(false)}
+                  className="btn-primary"
+                >
+                  Got it — use Demo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

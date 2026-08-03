@@ -236,6 +236,7 @@ export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerC
               <label className="label">Username</label>
               <input
                 className="input"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="optional"
