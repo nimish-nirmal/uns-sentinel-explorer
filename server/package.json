@@ -1,0 +1,16 @@
+{
+  "name": "uns-sentinel-explorer-server",
+  "version": "1.0.0",
+  "description": "Node.js TCP Gateway for UNS Sentinel Explorer - Raw MQTT broker connections",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "mqtt": "^5.10.1",
+    "socket.io": "^4.8.0",
+    "cors": "^2.8.5"
+  }
+}
