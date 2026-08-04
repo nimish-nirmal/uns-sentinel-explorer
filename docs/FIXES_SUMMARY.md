@@ -300,6 +300,19 @@
 **Files**: `server/index.js`, `src/engine/mqttEngine.ts`
 **Status**: Fixed
 
+### 37. ✅ Mixed Content: WS blocked on HTTPS (GitHub Pages / Vercel)
+**Problem**: On HTTPS-hosted pages (GitHub Pages, Vercel), the browser blocked `ws://` connections to broker.hivemq.com:8000 with "Mixed Content" errors, preventing all Direct Browser connections.
+**Solution**: 
+- `connectViaBrowser()` in mqttEngine.ts now detects when the page is served over HTTPS and **auto-upgrades** `ws://` → `wss://`
+- Common insecure WebSocket ports are remapped to their secure equivalents: HiveMQ 8000→8884, Mosquitto 8080→8081, EMQX 8083→8084
+- Default browser-mode brokers (HiveMQ, Mosquitto, EMQX) now ship with `wss` protocol + secure WebSocket ports
+- `loadSavedBrokers()` migration upgrades existing saved insecure default brokers to WSS automatically
+- `BrokerConfigModal` defaults to WSS on HTTPS pages and warns users who select WS
+**Files**: `src/engine/mqttEngine.ts`, `src/lib/storage.ts`, `src/components/modals/BrokerConfigModal.tsx`
+**Status**: Fixed
+
+> **Note on Permissions-Policy warnings**: The `Permissions-Policy` console warnings (e.g. `Unrecognized feature: 'private-state-token-redemption'`, `'browsing-topics'`, etc.) are **not caused by this application**. They come from GitHub Pages' default response headers and are harmless browser noise. They cannot be fixed from the app side.
+
 ---
 
 ## Current Architecture
@@ -328,10 +341,10 @@ flowchart LR
 | # | Name | Host | Port | Protocol | Mode |
 |---|------|------|------|----------|------|
 | 1 | Mosquitto Public Broker | test.mosquitto.org | 1883 | mqtt | gateway |
-| 2 | Mosquitto Public Broker (WebSocket) | test.mosquitto.org | 8080 | ws | browser |
-| 3 | EMQX Public Broker | broker.emqx.io | 8083 | ws | browser |
+| 2 | Mosquitto Public Broker (WebSocket) | test.mosquitto.org | 8081 | wss | browser |
+| 3 | EMQX Public Broker | broker.emqx.io | 8084 | wss | browser |
 | 4 | EMQX Public Broker (TCP) | broker.emqx.io | 1883 | mqtt | gateway |
-| 5 | HiveMQ Public Broker | broker.hivemq.com | 8000 | ws | browser |
+| 5 | HiveMQ Public Broker | broker.hivemq.com | 8884 | wss | browser |
 | 6 | HiveMQ Public Broker (TCP) | broker.hivemq.com | 1883 | mqtt | gateway |
 | 7 | Eclipse Public Broker | mqtt.eclipseprojects.io | 443 | wss | browser |
 | 8 | Eclipse Public Broker (TCP) | mqtt.eclipseprojects.io | 1883 | mqtt | gateway |

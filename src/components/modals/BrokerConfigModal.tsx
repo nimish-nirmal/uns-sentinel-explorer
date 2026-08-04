@@ -18,15 +18,20 @@ const DEFAULT_TOPICS = ['Enterprise/Site1/Area1/Line1/Cell1/#', 'legacy/sensors/
 const DEFAULT_PORTS = {
   mqtt: 1883,   // Standard MQTT port
   mqtts: 8883,  // Secure MQTT port
-  ws: 8080,     // WebSocket port
+  ws: 8080,     // WebSocket port (insecure — blocked on HTTPS pages!)
   wss: 8084,    // Secure WebSocket port
 } as const;
 
 export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerConfigModalProps) {
+  /** Whether the page is served over HTTPS — if so, ws:// connections are blocked by the browser */
+  const pageIsHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+  // If the page is HTTPS and no protocol was specified, default to WSS (browser mode)
+  const defaultProtocol: 'mqtt' | 'mqtts' | 'ws' | 'wss' = pageIsHttps ? 'wss' : 'ws';
   const [name, setName] = useState(initial?.name ?? '');
-  const [protocol, setProtocol] = useState<'mqtt' | 'mqtts' | 'ws' | 'wss'>(initial?.protocol ?? 'ws');
+  const [protocol, setProtocol] = useState<'mqtt' | 'mqtts' | 'ws' | 'wss'>(initial?.protocol ?? defaultProtocol);
   const [host, setHost] = useState(initial?.host ?? 'test.mosquitto.org');
-  const [port, setPort] = useState(initial?.port ?? DEFAULT_PORTS.ws);
+  const [port, setPort] = useState(initial?.port ?? DEFAULT_PORTS[defaultProtocol]);
   const [clientId, setClientId] = useState(initial?.clientId ?? '');
   const [username, setUsername] = useState(initial?.username ?? '');
   const [password, setPassword] = useState(initial?.password ?? '');
@@ -60,9 +65,12 @@ export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerC
     if (!open) return;
 
     setName(initial?.name ?? '');
-    setProtocol(initial?.protocol ?? 'mqtt');
+    // When no initial config and page is HTTPS, default to WSS so browser-mode
+    // connections aren't blocked by the browser's Mixed Content policy.
+    const effectiveDefaultProtocol = initial?.protocol ?? (pageIsHttps ? 'wss' : 'mqtt');
+    setProtocol(effectiveDefaultProtocol);
     setHost(initial?.host ?? '');
-    setPort(initial?.port ?? DEFAULT_PORTS[initial?.protocol ?? 'mqtt']);
+    setPort(initial?.port ?? DEFAULT_PORTS[effectiveDefaultProtocol]);
     setClientId(initial?.clientId ?? '');
     setUsername(initial?.username ?? '');
     setPassword(initial?.password ?? '');
@@ -167,6 +175,10 @@ export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerC
   };
 
   const handleProtocolChange = (p: 'mqtt' | 'mqtts' | 'ws' | 'wss') => {
+    // Warn when selecting insecure WS on an HTTPS page — the browser will block it
+    if (pageIsHttps && p === 'ws' && connectionMode === 'browser') {
+      console.warn('[BrokerConfig] WS is blocked on HTTPS pages — consider using WSS instead.');
+    }
     setProtocol(p);
     setPort(DEFAULT_PORTS[p]);
   };
@@ -280,6 +292,11 @@ export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerC
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">
                   MQTT/MQTTS = raw TCP (1883/8883). WS/WSS = WebSocket (8080/8084).
+                  {pageIsHttps && (
+                    <span className="text-amber-400/80 block mt-1">
+                      ⚠️ This page is served over HTTPS — use WSS for browser connections (WS is blocked).
+                    </span>
+                  )}
                 </p>
                 <div className="mt-2 rounded-md bg-base-950 border border-slate-800 p-2 text-[10px] text-slate-500">
                   <div className="font-semibold text-slate-400 mb-1">Common Broker Ports:</div>
@@ -289,7 +306,7 @@ export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerC
                     <div>WS: 8080/8083/8000</div>
                     <div>WSS: 8084/8884</div>
                   </div>
-                  <div className="mt-1 text-slate-600">* WebSocket ports vary by broker (EMQX: 8083, HiveMQ: 8000, Mosquitto: 8080)</div>
+                  <div className="mt-1 text-slate-600">* WebSocket ports vary by broker (EMQX: 8083, HiveMQ: 8000, Mosquitto: 8080) — WSS versions: Mosquitto 8081, EMQX 8084, HiveMQ 8884</div>
                 </div>
               </div>
 

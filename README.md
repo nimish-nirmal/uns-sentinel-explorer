@@ -254,7 +254,7 @@ Click **`+ Add Session`** in the top tab bar:
 | **Connection Mode** | `Backend Gateway` / `Direct Browser` | Gateway = TCP via Node.js; Browser = WebSocket direct |
 | **Protocol**     | `MQTT` / `MQTTS` / `WS` / `WSS` | Auto-adjusts default port |
 | **Host**         | `test.mosquitto.org`   | Public test broker (default)   |
-| **Port**         | `1883` (MQTT) / `8080` (WS) / `8883` (MQTTS) / `8084` (WSS) | Auto-set by protocol |
+| **Port**         | `1883` (MQTT) / `8081` (WS) / `8883` (MQTTS) / `8084` (WSS) | Auto-set by protocol |
 | **Session Label**| `My Factory UNS`       | Shown on the session tab       |
 | **Client ID**    | *(auto-generated)*     | Optional — leave blank for random |
 | **Anonymous**    | ✅ checked              | Uncheck to enter username/password |
@@ -267,11 +267,13 @@ Click **`+ Add Session`** in the top tab bar:
 
 **Default brokers included** (pre-seeded in Saved Brokers):
 
-| Broker | TCP Port (Gateway) | WebSocket Port (Browser) |
+> **ℹ️ HTTPS note:** When the app is served over HTTPS (e.g. GitHub Pages), browsers **block insecure `ws://` connections**. The app auto-upgrades `ws` → `wss` and remaps the port to the broker's secure WebSocket port. For this reason, browser-mode default brokers ship with **WSS** and their secure ports.
+
+| Broker | TCP Port (Gateway) | Secure WebSocket Port (Browser) |
 | ------ | ------------------ | ------------------------ |
-| `test.mosquitto.org` | 1883 | 8080 |
-| `broker.emqx.io` | 1883 | 8083 |
-| `broker.hivemq.com` | 1883 | 8000 |
+| `test.mosquitto.org` | 1883 | 8081 (WSS) |
+| `broker.emqx.io` | 1883 | 8084 (WSS) |
+| `broker.hivemq.com` | 1883 | 8884 (WSS) |
 | `mqtt.eclipseprojects.io` | 1883 | 443 (WSS) |
 
 **Test brokers you can use:**
@@ -282,6 +284,8 @@ Click **`+ Add Session`** in the top tab bar:
 | `test.mosquitto.org` | 8081  | 8080    | 1883     |
 | `broker.hivemq.com`  | 8884  | 8000    | 1883     |
 | `mqtt.eclipseprojects.io` | 443 | — | 1883 |
+
+> **Browser mode on HTTPS pages:** Direct Browser connections always use the **WSS** port — the browser refuses insecure `ws://` from an HTTPS page.
 
 ---
 
@@ -395,7 +399,7 @@ flowchart LR
         Gateway1 -->|"TCP MQTT"| Broker1["MQTT Broker\n(1883/8883)"]
     end
     subgraph BrowserMode["Direct Browser Mode"]
-        Browser2["Browser"] -->|"MQTT over WebSocket"| Broker2["MQTT Broker\n(8080/8083/8084)"]
+        Browser2["Browser"] -->|"MQTT over WebSocket (wss)"| Broker2["MQTT Broker\n(8081/8084/8884)"]
     end
 ```
 

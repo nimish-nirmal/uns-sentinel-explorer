@@ -21,6 +21,17 @@ export function loadSavedBrokers(): SavedBroker[] {
       if (broker.id === 'default-test-mosquitto' && broker.port === 8080) {
         return { ...broker, port: 1883, protocol: 'mqtt' };
       }
+      // Migrate insecure WebSocket defaults → secure WSS (required when the
+      // app is served over HTTPS, e.g. GitHub Pages / Vercel).
+      if (broker.id === 'default-mosquitto-ws' && (broker.port === 8080 || broker.protocol === 'ws')) {
+        return { ...broker, port: 8081, protocol: 'wss' };  // Mosquitto secure WebSocket
+      }
+      if (broker.id === 'default-emqx' && (broker.port === 8083 || broker.protocol === 'ws')) {
+        return { ...broker, port: 8084, protocol: 'wss' };  // EMQX secure WebSocket
+      }
+      if (broker.id === 'default-hivemq' && (broker.port === 8000 || broker.protocol === 'ws')) {
+        return { ...broker, port: 8884, protocol: 'wss' };  // HiveMQ secure WebSocket
+      }
       return broker;
     });
     
@@ -177,8 +188,8 @@ export function getDefaultBrokers(): SavedBroker[] {
       id: 'default-mosquitto-ws',
       name: 'Mosquitto Public Broker (WebSocket)',
       host: 'test.mosquitto.org',
-      port: 8080,  // WebSocket port (works in browser mode on static hosting)
-      protocol: 'ws',
+      port: 8081,  // Secure WebSocket port (WSS) — required when page is served over HTTPS
+      protocol: 'wss',
       connectionMode: 'browser',
       clientId: clientId(),
       subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
@@ -188,8 +199,8 @@ export function getDefaultBrokers(): SavedBroker[] {
       id: 'default-emqx',
       name: 'EMQX Public Broker',
       host: 'broker.emqx.io',
-      port: 8083,  // WebSocket port (works in browser mode on static hosting)
-      protocol: 'ws',
+      port: 8084,  // Secure WebSocket port (WSS) — required when page is served over HTTPS
+      protocol: 'wss',
       connectionMode: 'browser',
       clientId: clientId(),
       subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
@@ -210,8 +221,8 @@ export function getDefaultBrokers(): SavedBroker[] {
       id: 'default-hivemq',
       name: 'HiveMQ Public Broker',
       host: 'broker.hivemq.com',
-      port: 8000,  // WebSocket port (works in browser mode on static hosting)
-      protocol: 'ws',
+      port: 8884,  // Secure WebSocket port (WSS) — required when page is served over HTTPS
+      protocol: 'wss',
       connectionMode: 'browser',
       clientId: clientId(),
       subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),

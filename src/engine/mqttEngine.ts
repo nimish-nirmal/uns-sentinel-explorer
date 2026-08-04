@@ -363,21 +363,50 @@ export class MqttEngine {
     // Mark as connecting to prevent duplicates
     this.connectingBrokers.add(brokerKey);
 
-    // Build WebSocket URL for browser connection
-    // Most brokers require a path (typically /mqtt) for WebSocket connections
+    // Build WebSocket URL for browser connection.
+    // Browsers can ONLY use WebSocket (ws/wss) — raw TCP (mqtt/mqtts) is not
+    // possible from a browser. So we map the protocol to its WebSocket equivalent.
+    //
+    // CRITICAL: If the page is served over HTTPS (e.g. GitHub Pages, Vercel),
+    // the browser BLOCKS insecure `ws://` connections (Mixed Content policy).
+    // We must auto-upgrade `ws` → `wss` and remap the port to the broker's
+    // secure WebSocket port.
+    const pageIsHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+    // Determine the base WebSocket protocol from the config.
     let wsProtocol: string;
     if (config.protocol === 'wss' || config.protocol === 'mqtts') {
       wsProtocol = 'wss';
     } else {
       wsProtocol = 'ws';
     }
+
+    // If the page is HTTPS but the config requests insecure `ws`, auto-upgrade
+    // to `wss` and remap the port to the broker's secure WebSocket port.
+    let effectivePort = config.port;
+    if (pageIsHttps && wsProtocol === 'ws') {
+      console.warn(
+        `[Browser] Page is served over HTTPS — auto-upgrading ws:// to wss:// for ${config.host}:${config.port}`
+      );
+      wsProtocol = 'wss';
+      // Map common insecure WebSocket ports to their secure equivalents.
+      // If the port is not in the map, keep it (some brokers use the same
+      // port for both ws and wss, e.g. 443).
+      const securePortMap: Record<number, number> = {
+        8000: 8884,  // HiveMQ: ws:8000 → wss:8884
+        8080: 8081,  // Mosquitto: ws:8080 → wss:8081
+        8083: 8084,  // EMQX: ws:8083 → wss:8084
+      };
+      effectivePort = securePortMap[config.port] ?? config.port;
+    }
+
     // Add /mqtt path if not already present (standard WebSocket MQTT path)
     let wsPath = '/mqtt';
-    if (config.port === 8000 || config.port === 8080 || config.port === 8083) {
+    if (effectivePort === 8000 || effectivePort === 8080 || effectivePort === 8083) {
       // Common WebSocket ports that typically use /mqtt path
       wsPath = '/mqtt';
     }
-    const url = `${wsProtocol}://${config.host}:${config.port}${wsPath}`;
+    const url = `${wsProtocol}://${config.host}:${effectivePort}${wsPath}`;
 
     // Build mqtt.js options
     const mqttOptions: any = {
