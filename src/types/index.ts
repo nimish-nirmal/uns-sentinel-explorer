@@ -9,6 +9,8 @@ export type TreeNodeType = 'isa95' | 'legacy' | 'sys';
 export interface TopicSubscription {
   pattern: string;
   qos: 0 | 1 | 2;
+  status?: 'subscribed' | 'error' | 'pending';
+  errorMessage?: string;
 }
 
 /** Broker connection configuration */
@@ -22,6 +24,32 @@ export interface BrokerConfig {
   username?: string;
   password?: string;
   subscriptions: TopicSubscription[];
+  /** Connection mode: 'gateway' = Node.js backend proxy, 'browser' = direct mqtt.js in browser */
+  connectionMode?: 'gateway' | 'browser';
+  /** MQTT protocol version: 3 = MQTT 3.1, 4 = MQTT 3.1.1, 5 = MQTT 5.0.
+   *  Defaults to 4 (3.1.1) if not specified. The backend will auto-fallback
+   *  from 4 → 3 if the broker rejects the requested version. */
+  protocolVersion?: 3 | 4 | 5;
+  /** Connection timeout in seconds (default: 10) */
+  connectTimeout?: number;
+  /** Keep alive interval in seconds (default: 60) */
+  keepAlive?: number;
+  /** Enable automatic reconnection (default: true) */
+  autoReconnect?: boolean;
+  /** MQTT 3.x: Clean session flag. MQTT 5.0: Clean start flag (default: true) */
+  cleanSession?: boolean;
+  /** MQTT 5.0 only: Session expiry interval in seconds (0 = immediate expiry) */
+  sessionExpiryInterval?: number;
+  /** MQTT 5.0 only: Receive maximum - max QoS 1/2 messages to queue (default: 65535) */
+  receiveMaximum?: number;
+  /** MQTT 5.0 only: Maximum packet size in bytes (default: 0 = no limit) */
+  maximumPacketSize?: number;
+  /** MQTT 5.0 only: Topic alias maximum (default: 0) */
+  topicAliasMaximum?: number;
+  /** MQTT 5.0 only: Request response info (default: false) */
+  requestResponseInfo?: boolean;
+  /** MQTT 5.0 only: Request problem info (default: false) */
+  requestProblemInfo?: boolean;
   /** Skip TLS certificate validation (for self-signed certs) */
   rejectUnauthorized?: boolean;
   /** Path to CA certificate file (optional) */

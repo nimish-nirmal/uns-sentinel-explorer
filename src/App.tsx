@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlaskConical, Loader2, Pause, Play, BookOpen, Github, AlertTriangle, X } from 'lucide-react';
+import { FlaskConical, Loader2, Pause, Play, BookOpen, Github, AlertTriangle, X, Sun, Moon, Radar } from 'lucide-react';
 import type { BrokerConfig, Session, SessionStatus, UNSTreeNode, SavedBroker } from './types';
 import { MqttEngine, type MessageBatch, decodePayload, generateSessionId } from './engine/mqttEngine';
 import { startSimulator, type SimulatorControl } from './engine/simulator';
-import { upsertTopicNode, findNodeByPath } from './engine/topicTree';
+import { upsertTopicNode, findNodeByPath, cloneTree } from './engine/topicTree';
 import { loadSavedBrokers, upsertSavedBroker, deleteSavedBroker } from './lib/storage';
 import { SessionBar } from './components/SessionBar';
 import { TopicTree } from './components/TopicTree';
@@ -29,24 +29,33 @@ export default function App() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [selectedTelemetryKeys, setSelectedTelemetryKeys] = useState<Set<string>>(new Set());
   const [showGatewayWarning, setShowGatewayWarning] = useState(false);
+  const [gatewayConnected, setGatewayConnected] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
 
   const engineRef = useRef<MqttEngine | null>(null);
   const simControlRef = useRef<SimulatorControl | null>(null);
   const isSimulatingRef = useRef(false);
   const toggleSimulatorRef = useRef<() => void>(() => {});
   const [isPaused, setIsPaused] = useState(false);
+  const connectingRef = useRef<Set<string>>(new Set());
+  const sessionsRef = useRef<Session[]>([]);
+  /** Tracks whether the user has ever used Backend Gateway mode (needs the Node.js server) */
+  const gatewayModeUsedRef = useRef(false);
 
   const applyMessageBatch = useCallback((sessionId: string, batch: MessageBatch[]) => {
     setSessions((prev) =>
       prev.map((session) => {
         if (session.config.id !== sessionId) return session;
         const now = Date.now();
+        // Clone the tree before updating to ensure React detects the change
+        const updatedTree = cloneTree(session.tree);
         for (const msg of batch) {
           const decoded = decodePayload(msg.payload);
-          upsertTopicNode(session.tree, msg.topic, decoded.value, decoded.raw, msg.retained, now);
+          upsertTopicNode(updatedTree, msg.topic, decoded.value, decoded.raw, msg.retained, now);
         }
-        // Create a new root reference so React re-renders and memos recompute
-        return { ...session, tree: { ...session.tree } };
+        // Return new session object with cloned tree
+        return { ...session, tree: updatedTree };
       })
     );
     setSelectedNode((prev) => {
@@ -59,9 +68,14 @@ export default function App() {
   }, []);
 
   const handleStatus = useCallback((sessionId: string, status: SessionStatus, message?: string) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.config.id === sessionId ? { ...s, status, statusMessage: message ?? s.statusMessage } : s))
-    );
+    setSessions((prev) => {
+      const session = prev.find((s) => s.config.id === sessionId);
+      // Clear connecting flag when connection succeeds or fails
+      if (session && (status === 'connected' || status === 'error')) {
+        connectingRef.current.delete(sessionId);
+      }
+      return prev.map((s) => (s.config.id === sessionId ? { ...s, status, statusMessage: message ?? s.statusMessage } : s));
+    });
   }, []);
 
   const handleStatsTick = useCallback((sessionId: string, stats: Session['stats']) => {
@@ -75,7 +89,22 @@ export default function App() {
       onStatsTick: handleStatsTick,
       // When the backend gateway is unreachable (e.g. static GitHub Pages demo),
       // automatically launch the Demo Simulator so the app is fully functional.
+      // IMPORTANT: This only applies to Backend Gateway mode. Direct Browser
+      // connections don't need the gateway, so the warning is suppressed when
+      // the user has only used browser-mode sessions.
+      onGatewayStatus: (connected) => {
+        setGatewayConnected(connected);
+      },
       onGatewayUnavailable: () => {
+        // Direct Browser connections don't need the gateway. If there are active
+        // browser sessions (or only browser mode was ever used), the gateway
+        // being down is irrelevant — do NOT show the warning or auto-launch the
+        // simulator (which would wipe the active browser sessions).
+        const hasActiveSessions = sessionsRef.current.length > 0;
+        if (!gatewayModeUsedRef.current || hasActiveSessions) {
+          console.log('[App] Gateway unavailable, suppressing warning (no gateway sessions in use).');
+          return;
+        }
         console.log('[App] Gateway unavailable — auto-launching Demo Simulator');
         // Show warning popup
         setShowGatewayWarning(true);
@@ -108,25 +137,40 @@ export default function App() {
     const engine = engineRef.current;
     if (!engine) return;
     
+    // Prevent duplicate connections
+    if (connectingRef.current.has(config.id)) {
+      console.log(`[App] Already connecting to ${config.id}, skipping duplicate`);
+      return;
+    }
+    
     // Always save to localStorage if requested
     if (save) setSavedBrokers(upsertSavedBroker({ ...config, savedAt: Date.now() }));
     
+    // Mark as connecting
+    connectingRef.current.add(config.id);
+    
+    // Track whether the user is using Backend Gateway mode — the gateway
+    // unavailable fallback only applies to gateway-mode connections.
+    if (config.connectionMode === 'gateway') {
+      gatewayModeUsedRef.current = true;
+    }
+    
+    // Destroy any existing session with the same ID (supports "Update & Reconnect").
+    // This MUST run outside the state updater — React StrictMode double-invokes
+    // updaters in development, and calling createSession/destroySession inside a
+    // setSessions updater caused duplicate MQTT connections to the same broker.
+    const existingSession = sessionsRef.current.find((s) => s.config.id === config.id);
+    if (existingSession) {
+      engine.destroySession(config.id);
+    }
+    
+    // Create the engine session outside the state updater so it runs exactly
+    // once per click (event handlers are not double-invoked by StrictMode).
+    const session = engine.createSession(config);
+    
     setSessions((prev) => {
-      const existing = prev.find((s) => s.config.id === config.id);
+      // Pure updater — no side effects — safe under React StrictMode.
       const idx = prev.findIndex((s) => s.config.id === config.id);
-      
-      // If session already exists and is connected/connecting, don't recreate it
-      if (existing && (existing.status === 'connected' || existing.status === 'connecting')) {
-        console.log(`[App] Session ${config.id} already exists with status: ${existing.status}, skipping duplicate connection`);
-        return prev;
-      }
-      
-      // Only destroy if session exists but is in error/disconnected state
-      if (existing) {
-        engine.destroySession(config.id);
-      }
-      
-      const session = engine.createSession(config);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = session;
@@ -135,6 +179,11 @@ export default function App() {
       return [...prev, session];
     });
     setActiveSessionId(config.id);
+    
+    // Clear connecting flag after a short delay to allow the connection to start
+    setTimeout(() => {
+      connectingRef.current.delete(config.id);
+    }, 500);
   }, []);
 
   const handleRemoveSession = useCallback((sessionId: string) => {
@@ -234,6 +283,17 @@ export default function App() {
     toggleSimulatorRef.current = toggleSimulator;
   }, [toggleSimulator]);
 
+  // Splash screen: show project description for 5 seconds, then
+  // auto-open the Saved Brokers list so the user can pick a broker.
+  useEffect(() => {
+    if (!showSplash) return;
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+      setShowSavedBrokers(true);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [showSplash]);
+
   const handleTogglePause = useCallback(() => {
     setIsPaused((prev) => {
       const next = !prev;
@@ -257,6 +317,11 @@ export default function App() {
       setActiveSessionId(sessions[0].config.id);
     }
   }, [sessions.length, activeSessionId]);
+
+  // Keep sessionsRef in sync for synchronous reads in event handlers
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.config.id === activeSessionId) ?? null,
@@ -304,11 +369,20 @@ export default function App() {
     setSavedBrokers(loadSavedBrokers());
   }, []);
 
+  // Toggle dark/light mode
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
   const statusInfo =
     activeSession?.status === 'connected'
       ? activeSession.statusMessage?.startsWith('Subscribe error:')
-        ? `LIVE — ${activeSession.config.name} ⚠ ${activeSession.statusMessage}`
-        : `LIVE — ${activeSession.config.name}`
+        ? activeSession.config.name
+        : activeSession.config.name
       : activeSession?.status === 'connecting'
         ? 'Connecting…'
         : activeSession?.status === 'error'
@@ -334,6 +408,29 @@ export default function App() {
           <span className="text-[10px] text-slate-600">by Nimish Nirmal</span>
         </div>
         <div className="flex items-center gap-3">
+          {/* Backend gateway connection indicator */}
+          <span
+            className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors ${
+              gatewayConnected
+                ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                : 'text-slate-500 border-slate-700 bg-slate-800/50'
+            }`}
+            title={
+              gatewayConnected
+                ? 'Backend gateway connected — TCP (1883) and self-signed TLS brokers available'
+                : 'Backend gateway not connected — use Direct Browser mode or run locally with npm run dev:all'
+            }
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${gatewayConnected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+            {gatewayConnected ? 'Gateway Online' : 'Gateway Offline'}
+          </span>
+          <button
+            onClick={() => setDarkMode((prev) => !prev)}
+            className="text-slate-500 hover:text-cyan-400 transition-colors"
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
           <a
             href="https://github.com/nimish-nirmal/uns-sentinel-explorer/blob/main/README.md"
             target="_blank"
@@ -432,10 +529,15 @@ export default function App() {
             onPublishTopic={handlePublishFromTree}
             selectedKeys={selectedTelemetryKeys}
             onToggleKey={handleToggleTelemetryKey}
+            darkMode={darkMode}
           />
         </div>
         <div className="w-[25%] min-w-[200px]">
-          <HealthPanel session={activeSession} selectedTelemetryKeys={selectedTelemetryKeys} />
+          <HealthPanel
+            session={activeSession}
+            selectedTelemetryKeys={selectedTelemetryKeys}
+            onToggleTelemetryKey={handleToggleTelemetryKey}
+          />
         </div>
       </div>
 
@@ -451,6 +553,7 @@ export default function App() {
       <SavedBrokersList
         open={showSavedBrokers}
         brokers={savedBrokers}
+        activeSessions={sessions}
         onClose={() => setShowSavedBrokers(false)}
         onLaunch={handleLaunchBroker}
         onEdit={handleEditBroker}
@@ -468,6 +571,38 @@ export default function App() {
         open={showActiveSessionsModal}
         onClose={() => setShowActiveSessionsModal(false)}
       />
+
+      {/* Splash screen — shown on first load for 2 seconds */}
+      {showSplash && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/95 backdrop-blur-sm">
+          <div className="panel w-[520px] animate-fade-in">
+            <div className="panel-header">
+              <span className="flex items-center gap-2 text-cyan-400">
+                <Radar className="w-4 h-4" />
+                UNS Sentinel Explorer
+              </span>
+              <span className="text-[10px] text-slate-500">by Nimish Nirmal</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-slate-300 leading-relaxed">
+                <strong className="text-cyan-400">UNS Sentinel Explorer</strong> is a real-time
+                monitoring tool for <strong className="text-slate-200">ISA-95 / UNS (Unified Namespace)</strong>{' '}
+                MQTT namespaces. It visualizes live telemetry as a dynamic topic tree, tracks
+                payload diffs, and plots numeric trends — all in your browser.
+              </p>
+              <div className="rounded-md bg-base-950 border border-slate-800 p-3 text-xs text-slate-400 space-y-1">
+                <div>• Connect to any public MQTT broker (EMQX, Mosquitto, HiveMQ, Eclipse)</div>
+                <div>• Explore the UNS topic hierarchy in real time</div>
+                <div>• Monitor throughput, health KPIs & telemetry trends</div>
+                <div>• Publish messages & diff payload changes</div>
+              </div>
+              <p className="text-xs text-slate-500">
+                Opening the broker list…
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gateway unavailable warning popup */}
       {showGatewayWarning && (

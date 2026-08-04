@@ -6,6 +6,16 @@ import type { UNSTreeNode, TreeNodeType } from '../types';
 
 const ISA95_LEVELS = ['enterprise', 'site', 'area', 'line', 'cell', 'unit', 'equipment'] as const;
 
+/** Deep clone a tree node (needed for React state updates) */
+export function cloneTree(node: UNSTreeNode): UNSTreeNode {
+  return {
+    ...node,
+    children: new Map(
+      Array.from(node.children.entries()).map(([name, child]) => [name, cloneTree(child)])
+    ),
+  };
+}
+
 /** Classify a topic path segment/level to determine ISA-95 vs legacy vs $SYS */
 export function classifyTopicPath(path: string): TreeNodeType {
   if (path.startsWith('$SYS')) return 'sys';

@@ -30,6 +30,12 @@ flowchart LR
 - **Auto-reconnection**: Automatic reconnection to MQTT brokers
 - **Multiple Sessions**: Support for multiple simultaneous broker connections
 - **Topic Subscription**: Wildcard topic subscription support
+- **Port Auto-Conversion**: Converts frontend WebSocket ports to TCP ports (8080/8083 → 1883, 8084/443 → 8883)
+- **Protocol Version Fallback**: Defaults to MQTT 3.1.1 (v4); auto-retries with v3 if rejected; v5 on explicit request
+- **Readable Errors**: Converts raw MQTT errors (ECONNRESET, ETIMEDOUT, etc.) into human-readable messages
+- **Subscribe Error Handling**: Emits `mqtt:subscribe:error` when a subscription fails or QoS 135 (not authorized) is returned
+- **Session Tracking**: Tracks sessions per Socket.io client; auto-cleans up on client disconnect
+- **Attribution Endpoint**: Tamper-proof project metadata at `/api/uns/attribution`
 
 ## Installation
 
@@ -134,6 +140,21 @@ Health check endpoint
 }
 ```
 
+#### GET /api/uns/attribution
+Returns project attribution metadata (tamper-proof).
+
+**Response:**
+```json
+{
+  "project": "UNS Sentinel Explorer",
+  "version": "1.0.0",
+  "author": "Nimish Nirmal",
+  "email": "nimish.nirmal@outlook.com",
+  "github": "https://github.com/nimish-nirmal/uns-sentinel-explorer",
+  "license": "MIT"
+}
+```
+
 ### WebSocket Events
 
 #### Client → Server
@@ -152,10 +173,11 @@ Health check endpoint
     "timestamp": 1234567890
   }
   ```
-- `mqtt:connected` - Connection confirmed
-- `mqtt:disconnect` - Connection closed
-- `mqtt:error` - Error occurred
-- `mqtt:offline` - Broker offline
+- `mqtt:connected` - Connection confirmed (`{ sessionId, host, port }`)
+- `mqtt:disconnect` - Connection closed (`{ sessionId }`)
+- `mqtt:error` - Error occurred (`{ sessionId, error }`)
+- `mqtt:offline` - Broker offline (`{ sessionId }`)
+- `mqtt:subscribe:error` - Subscription failed (`{ sessionId, topic, error }`)
 
 ## Configuration
 
@@ -163,12 +185,27 @@ Environment variables:
 
 - `PORT` - Server port (default: 4000)
 
+## Port Auto-Conversion
+
+The frontend sends WebSocket ports (used by browsers), but the Node.js backend connects via TCP. The gateway automatically converts:
+
+| Frontend Port | Backend Port | Protocol |
+| ------------- | ------------ | -------- |
+| 8080 | 1883 | `mqtt://` |
+| 8083 | 1883 | `mqtt://` |
+| 8084 | 8883 | `mqtts://` |
+| 443 | 8883 | `mqtts://` |
+
+## Protocol Version Fallback
+
+The gateway defaults to **MQTT 3.1.1 (protocol version 4)** — the most widely supported version. If a broker rejects it with "Unacceptable protocol version", the gateway automatically retries with MQTT 3.1 (v3). MQTT 5.0 (v5) is only used when explicitly requested by the client in Advanced settings.
+
 ## Protocol Support
 
 - `mqtt://` - MQTT over TCP (port 1883)
 - `mqtts://` - MQTT over TLS (port 8883)
-- `ws://` - MQTT over WebSocket (port 8080/8083)
-- `wss://` - MQTT over Secure WebSocket (port 8084/443)
+- `ws://` - MQTT over WebSocket (port 8080/8083) — converted to TCP by the gateway
+- `wss://` - MQTT over Secure WebSocket (port 8084/443) — converted to TLS by the gateway
 
 ## Example Usage
 
@@ -209,7 +246,20 @@ await fetch('http://localhost:4000/api/broker/publish', {
 
 ## Stopping the Server
 
-Press `Ctrl+C` to gracefully shutdown. All MQTT connections will be properly closed.
+Press `Ctrl+C` to gracefully shutdown. All MQTT connections will be properly closed. The server also handles `SIGINT` to close all active sessions before exiting.
+
+## Docker
+
+The server is included in the project's multi-stage `Dockerfile`:
+
+```bash
+# From project root
+docker compose up --build
+# → Gateway: http://localhost:4000
+# → Frontend: http://localhost:3000
+```
+
+Health check is configured on `/api/health` with a 30s interval.
 
 ---
 

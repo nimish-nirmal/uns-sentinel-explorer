@@ -2,7 +2,7 @@
  * Storage utilities — localStorage persistence for saved broker profiles,
  * plus workspace import/export as JSON files.
  */
-import type { SavedBroker, WorkspaceExport } from '../types';
+import type { SavedBroker, TopicSubscription, WorkspaceExport } from '../types';
 
 const STORAGE_KEY = 'uns-sentinel-explorer:brokers';
 const EXPORT_FILENAME = 'uns-sentinel-explorer-workspace.json';
@@ -30,8 +30,10 @@ export function loadSavedBrokers(): SavedBroker[] {
       // In browser environments, all protocols use WebSocket, so accept WebSocket ports for all
       const transportMatchesPort =
         (broker.port === 1883) ||  // Legacy TCP MQTT (will be converted to WS in browser)
+        (broker.port === 8000) ||  // WebSocket (HiveMQ)
         (broker.port === 8080) ||  // WebSocket (standard)
-        (broker.port === 8083) ||  // WebSocket (alternative)
+        (broker.port === 8081) ||  // Secure WebSocket (Mosquitto)
+        (broker.port === 8083) ||  // WebSocket (EMQX)
         (broker.port === 8084) ||  // Secure WebSocket
         (broker.port === 8883) ||  // Secure MQTT
         (broker.port === 8884) ||  // Secure MQTT alternative
@@ -149,31 +151,103 @@ function isValidBroker(b: any): b is SavedBroker {
   );
 }
 
+/** Default UNS subscription patterns used by all default brokers */
+const DEFAULT_UNS_TOPICS: TopicSubscription[] = [
+  { pattern: 'Enterprise/Site1/Area1/Line1/Cell1/#', qos: 0 },
+  { pattern: 'legacy/sensors/+/temp', qos: 0 },
+  { pattern: '$SYS/#', qos: 0 },
+];
+
 /** Get default brokers that should always be available */
 export function getDefaultBrokers(): SavedBroker[] {
+  const clientId = () => `uns-explorer-${Math.random().toString(36).slice(2, 8)}`;
   return [
     {
       id: 'default-test-mosquitto',
-      name: 'test.mosquitto.org',
+      name: 'Mosquitto Public Broker',
       host: 'test.mosquitto.org',
       port: 1883,  // Standard MQTT port (backend Node.js connects directly)
       protocol: 'mqtt',
-      clientId: `uns-explorer-${Math.random().toString(36).slice(2, 8)}`,
-      subscriptions: [
-        { pattern: 'test/topic/#', qos: 0 },
-      ],
+      connectionMode: 'gateway',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
+      savedAt: Date.now(),
+    },
+    {
+      id: 'default-mosquitto-ws',
+      name: 'Mosquitto Public Broker (WebSocket)',
+      host: 'test.mosquitto.org',
+      port: 8080,  // WebSocket port (works in browser mode on static hosting)
+      protocol: 'ws',
+      connectionMode: 'browser',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
       savedAt: Date.now(),
     },
     {
       id: 'default-emqx',
       name: 'EMQX Public Broker',
       host: 'broker.emqx.io',
-      port: 8083,
+      port: 8083,  // WebSocket port (works in browser mode on static hosting)
       protocol: 'ws',
-      clientId: `uns-explorer-${Math.random().toString(36).slice(2, 8)}`,
-      subscriptions: [
-        { pattern: 'test/topic/#', qos: 0 },
-      ],
+      connectionMode: 'browser',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
+      savedAt: Date.now(),
+    },
+    {
+      id: 'default-emqx-tcp',
+      name: 'EMQX Public Broker (TCP)',
+      host: 'broker.emqx.io',
+      port: 1883,  // Standard MQTT port (backend Node.js connects directly)
+      protocol: 'mqtt',
+      connectionMode: 'gateway',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
+      savedAt: Date.now(),
+    },
+    {
+      id: 'default-hivemq',
+      name: 'HiveMQ Public Broker',
+      host: 'broker.hivemq.com',
+      port: 8000,  // WebSocket port (works in browser mode on static hosting)
+      protocol: 'ws',
+      connectionMode: 'browser',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
+      savedAt: Date.now(),
+    },
+    {
+      id: 'default-hivemq-tcp',
+      name: 'HiveMQ Public Broker (TCP)',
+      host: 'broker.hivemq.com',
+      port: 1883,  // Standard MQTT port (backend Node.js connects directly)
+      protocol: 'mqtt',
+      connectionMode: 'gateway',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
+      savedAt: Date.now(),
+    },
+    {
+      id: 'default-eclipse',
+      name: 'Eclipse Public Broker',
+      host: 'mqtt.eclipseprojects.io',
+      port: 443,  // Secure WebSocket port (works in browser mode on static hosting)
+      protocol: 'wss',
+      connectionMode: 'browser',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
+      savedAt: Date.now(),
+    },
+    {
+      id: 'default-eclipse-tcp',
+      name: 'Eclipse Public Broker (TCP)',
+      host: 'mqtt.eclipseprojects.io',
+      port: 1883,  // Standard MQTT port (backend Node.js connects directly)
+      protocol: 'mqtt',
+      connectionMode: 'gateway',
+      clientId: clientId(),
+      subscriptions: DEFAULT_UNS_TOPICS.map((s) => ({ ...s })),
       savedAt: Date.now(),
     },
   ];

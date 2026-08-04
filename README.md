@@ -72,6 +72,7 @@
 - [⚙️ Configuration](#️-configuration)
 - [🛠️ Tech Stack](#️-tech-stack)
 - [📦 CI/CD & GitHub Pages](#-cicd--github-pages)
+- [🐳 Docker](#-docker)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
@@ -143,8 +144,40 @@ Auto-builds a hierarchical tree by parsing topic strings on `/`:
 - **Password eye toggle** — show/hide password with a click
 - TLS/Certificate options for secure brokers (WSS/MQTTS)
 - Protocol auto-port selection
+- **Anonymous toggle** — skip username/password fields for open brokers
+- **Advanced settings** — MQTT version (3.1 / 3.1.1 / 5.0), timeout, keep-alive, auto-reconnect, clean session, and MQTT 5.0 properties (session expiry, receive max, packet size, topic alias max, response/problem info)
 
----
+### 10. Dual Connection Modes 🔌
+Each broker session can connect in one of two modes:
+
+| Mode | How it works | When to use |
+| ---- | ------------ | ----------- |
+| **Backend Gateway** | Browser → Node.js gateway → MQTT broker (TCP) | Local dev with `npm run dev:all`, TCP brokers (1883/8883), self-signed TLS, credential security |
+| **Direct Browser** | Browser → MQTT broker (WebSocket) | Static hosting (GitHub Pages), no backend available, WebSocket brokers (8083/8084) |
+
+- The **Gateway Online/Offline** pill in the header shows whether the Node.js backend is reachable
+- On static hosting with no backend, the app **auto-falls back to Demo Simulator** (gateway mode only — browser sessions keep working)
+- Default brokers include both TCP (gateway) and WebSocket (browser) variants for EMQX, Mosquitto, HiveMQ, and Eclipse
+
+### 11. Dark / Light Mode 🌗
+- Full UI theme toggle (sun/moon icon in the header)
+- Monaco editor switches between `vs-dark` and `light` themes
+- Light-mode overrides for every dark utility class so the entire dashboard turns white — not just a few cards
+
+### 12. Pause / Resume Live Stream ⏸️
+- Freeze the live data stream for all sessions with one click
+- Simulator and MQTT sessions both respect the pause state
+- Useful for inspecting a payload snapshot without new updates overwriting it
+
+### 13. Active Backend Sessions 📡
+- Modal listing all MQTT connections maintained by the Node.js gateway
+- Shows host, port, protocol, topics, and connection duration
+- **Force close** any session directly from the UI
+
+### 14. Splash Screen & Onboarding 🚀
+- Project introduction splash on first load
+- Auto-opens the Saved Brokers list so new users can immediately pick a broker
+
 
 ## 🚀 Quick Start
 
@@ -159,18 +192,33 @@ Auto-builds a hierarchical tree by parsing topic strings on `/`:
 git clone https://github.com/nimish-nirmal/uns-sentinel-explorer.git
 cd uns-sentinel-explorer
 
-# Install dependencies
+# Install dependencies (frontend + server)
 npm install
+cd server && npm install && cd ..
 
-# Start the dev server
+# Start the frontend only (Vite dev server)
 npm run dev
 # → http://localhost:5173/uns-sentinel-explorer/
+
+# Start BOTH frontend + backend gateway (recommended for real MQTT)
+npm run dev:all
+# → Frontend: http://localhost:5173/uns-sentinel-explorer/
+# → Gateway:  http://localhost:4000
 
 # Production build
 npm run build
 
 # Preview the production build locally
 npm run preview
+```
+
+### Docker
+
+```bash
+# Build and run with Docker Compose (frontend + gateway in one container)
+docker compose up --build
+# → Gateway: http://localhost:4000
+# → Frontend served by gateway on port 3000
 ```
 
 ### Using Node installed outside PATH (like this workspace)
@@ -203,24 +251,37 @@ Click **`+ Add Session`** in the top tab bar:
 
 | Field            | Example                | Notes                          |
 | ---------------- | ---------------------- | ------------------------------ |
-| **Protocol**     | `WSS` (default) / `WS` | Auto-adjusts default port      |
-| **Host**         | `broker.emqx.io`       | Public test broker             |
-| **Port**         | `8084` (WSS) / `8083` (WS) | Auto-set by protocol      |
+| **Connection Mode** | `Backend Gateway` / `Direct Browser` | Gateway = TCP via Node.js; Browser = WebSocket direct |
+| **Protocol**     | `MQTT` / `MQTTS` / `WS` / `WSS` | Auto-adjusts default port |
+| **Host**         | `test.mosquitto.org`   | Public test broker (default)   |
+| **Port**         | `1883` (MQTT) / `8080` (WS) / `8883` (MQTTS) / `8084` (WSS) | Auto-set by protocol |
 | **Session Label**| `My Factory UNS`       | Shown on the session tab       |
 | **Client ID**    | *(auto-generated)*     | Optional — leave blank for random |
+| **Anonymous**    | ✅ checked              | Uncheck to enter username/password |
 | **Username**     | *(optional)*           | For authenticated brokers      |
 | **Password**     | *(optional, eye toggle)* | For authenticated brokers    |
 | **Subscription Patterns** | One per line    | Wildcards supported (`#`, `+`) |
 | **QoS**          | `0 / 1 / 2`            | Applied to all patterns        |
 | **Save to local storage** | ✅ checked      | Persists profile for later     |
+| **Advanced**     | MQTT version, timeout, keep-alive, MQTT 5.0 props | Collapsible section |
+
+**Default brokers included** (pre-seeded in Saved Brokers):
+
+| Broker | TCP Port (Gateway) | WebSocket Port (Browser) |
+| ------ | ------------------ | ------------------------ |
+| `test.mosquitto.org` | 1883 | 8080 |
+| `broker.emqx.io` | 1883 | 8083 |
+| `broker.hivemq.com` | 1883 | 8000 |
+| `mqtt.eclipseprojects.io` | 1883 | 443 (WSS) |
 
 **Test brokers you can use:**
 
-| Broker            | WSS Port | WS Port |
-| ----------------- | -------- | ------- |
-| `broker.emqx.io`  | 8084     | 8083    |
-| `test.mosquitto.org` | 8081  | 8080    |
-| `broker.hivemq.com`  | 8884  | 8000    |
+| Broker            | WSS Port | WS Port | TCP Port |
+| ----------------- | -------- | ------- | -------- |
+| `broker.emqx.io`  | 8084     | 8083    | 1883     |
+| `test.mosquitto.org` | 8081  | 8080    | 1883     |
+| `broker.hivemq.com`  | 8884  | 8000    | 1883     |
+| `mqtt.eclipseprojects.io` | 443 | — | 1883 |
 
 ---
 
@@ -290,6 +351,7 @@ flowchart TD
 
     MQTT <-->|"TCP MQTT"| Gateway
     Gateway <-->|"Socket.io WebSocket"| MqttEngine
+    MQTT <-->|"WebSocket (ws/wss)"| MqttEngine
     MqttEngine -->|"batched messages ≤20 FPS"| App
     App --> TopicTree
     App --> PayloadViewer
@@ -324,12 +386,32 @@ sequenceDiagram
     Health-->>PIP: live-update popup window
 ```
 
+### Dual Connection Modes
+
+```mermaid
+flowchart LR
+    subgraph GatewayMode["Backend Gateway Mode"]
+        Browser1["Browser"] -->|"Socket.io"| Gateway1["Node.js Gateway"]
+        Gateway1 -->|"TCP MQTT"| Broker1["MQTT Broker\n(1883/8883)"]
+    end
+    subgraph BrowserMode["Direct Browser Mode"]
+        Browser2["Browser"] -->|"MQTT over WebSocket"| Broker2["MQTT Broker\n(8080/8083/8084)"]
+    end
+```
+
+- **Backend Gateway** — the Node.js server translates Socket.io ↔ TCP MQTT, supports ports 1883/8883, keeps credentials server-side, and auto-converts WebSocket ports to TCP ports
+- **Direct Browser** — `mqtt.js` connects directly via WebSocket; works on static hosting (GitHub Pages) with no backend; auto-reconnect disabled to prevent thrashing
+- The gateway lazily connects only when a gateway-mode session is started, so browser-only deployments don't spam connection errors
+
 ### Performance Buffering
 Incoming MQTT packets are collected in an **in-memory batching array** and flushed to React state at **max 20 FPS** (50ms window). A batch cap of 500 messages protects memory on extreme loads — preventing UI freezes during high-rate bursts.
 
+### Protocol Version Fallback
+The backend gateway defaults to **MQTT 3.1.1 (protocol version 4)** — the most widely supported version. If a broker rejects it with "Unacceptable protocol version", the gateway automatically retries with MQTT 3.1 (v3). MQTT 5.0 (v5) is only used when explicitly selected in Advanced settings.
+
 ### Sparkplug B / Binary Handling
 Payloads are decoded in order:
-1. **JSON parse** — standard UTF-8 JSON payloads
+1. **JSON parse** — standard UTF-8 JSON payloads (including bare numbers)
 2. **Printable string** — fallback for plain text
 3. **Raw hex** — binary/protobuf (e.g. Sparkplug B) → `0x…`
 
@@ -346,14 +428,15 @@ Payloads are decoded in order:
 - Accents: cyan (`#22d3ee`), emerald (`#34d399`)
 
 ### Environment Variables
-| Variable | Purpose |
-| -------- | ------- |
-| `VITE_GATEWAY_URL` | Backend gateway URL (defaults to `http://localhost:4000`) |
+| Variable | Scope | Purpose |
+| -------- | ----- | ------- |
+| `VITE_GATEWAY_URL` | Frontend | Backend gateway URL (defaults to `http://localhost:4000`) |
+| `PORT` | Server | Gateway port (defaults to `4000`) |
 
 ### localStorage Keys
 | Key | Purpose |
 | --- | ------- |
-| `uns-sentinel-explorer:brokers` | Saved broker profiles |
+| `uns-sentinel-explorer:brokers` | Saved broker profiles (includes 8 default brokers) |
 
 ---
 
@@ -363,9 +446,9 @@ Payloads are decoded in order:
 | ---------- | -------------------------------- | ------- |
 | Framework  | React / Vite / TypeScript        | 18.3 / 5.4 / 5.6 |
 | Styling    | Tailwind CSS                     | 3.4     |
-| MQTT       | `mqtt` (WebSocket, v5 protocol)  | 5.10    |
+| MQTT       | `mqtt` (TCP + WebSocket, v3.1.1/5) | 5.10  |
 | Diff Viewer| `@monaco-editor/react`           | 4.6     |
-| Charts     | `recharts`                       | 2.15    |
+| Charts     | `recharts`                       | 2.13    |
 | Icons      | `lucide-react`                   | 0.441   |
 
 ---
@@ -381,6 +464,26 @@ Type-checks with `tsc --noEmit` and builds the production bundle. Badge:
 ### 2. Deploy to GitHub Pages (`deploy-pages.yml`)
 Builds and deploys the `dist/` directory to GitHub Pages. Requires Pages configured to **"GitHub Actions"** as the source in repo Settings → Pages. Badge:
 [![Pages Deploy](https://img.shields.io/github/actions/workflow/status/nimish-nirmal/uns-sentinel-explorer/deploy-pages.yml?label=Pages%20Deploy&style=flat-square&logo=github)](https://github.com/nimish-nirmal/uns-sentinel-explorer/actions/workflows/deploy-pages.yml)
+
+---
+
+## 🐳 Docker
+
+The project ships with a multi-stage `Dockerfile` and `docker-compose.yml` for containerized deployment:
+
+```bash
+# Build and run
+docker compose up --build
+
+# Or build manually
+docker build -t uns-sentinel-explorer .
+docker run -p 4000:4000 -p 3000:3000 uns-sentinel-explorer
+```
+
+- **Port 4000** — Node.js gateway (REST API + Socket.io)
+- **Port 3000** — Frontend served by the gateway
+- Health check: `GET /api/health`
+- Environment: `PORT=4000`, `VITE_GATEWAY_URL=http://localhost:4000`
 
 ---
 

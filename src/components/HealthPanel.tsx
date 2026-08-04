@@ -3,7 +3,7 @@
  * active subscription rule counts, and a mini throughput sparkline.
  */
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { Activity, Gauge, MessageSquare, Radio, FileJson2, ListChecks, Clock, LineChart as LineChartIcon, ExternalLink } from 'lucide-react';
+import { Activity, Gauge, MessageSquare, Radio, FileJson2, ListChecks, Clock, LineChart as LineChartIcon, ExternalLink, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import type { Session, TopicSubscription } from '../types';
 import { countNodes, countPayloadNodes, collectNumericLeafs } from '../engine/topicTree';
 import { formatBytes, formatNumber, formatRelativeTime } from '../lib/format';
@@ -21,6 +21,8 @@ import {
 interface HealthPanelProps {
   session: Session | null;
   selectedTelemetryKeys: Set<string>;
+  /** Toggle a telemetry key on/off (used to remove tags from the trends chart) */
+  onToggleTelemetryKey?: (key: string) => void;
 }
 
 interface TelemetrySeries {
@@ -31,7 +33,7 @@ interface TelemetrySeries {
 
 const CHART_COLORS = ['#22d3ee', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#f87171'];
 
-export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps) {
+export function HealthPanel({ session, selectedTelemetryKeys, onToggleTelemetryKey }: HealthPanelProps) {
   // All hooks MUST be called unconditionally - extract data first
   const stats = useMemo(() => session?.stats ?? { 
     messagesReceived: 0, 
@@ -98,7 +100,6 @@ export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps
       return;
     }
 
-    const lastMessageAt = session.stats.lastMessageAt ?? 0;
     const now = new Date().toLocaleTimeString();
     const sample: { time: string; [key: string]: number | string } = { time: now };
     const addedKeys = new Set<string>();
@@ -116,6 +117,21 @@ export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps
     });
 
     setTelemetryHistory((prev) => {
+      // Skip appending if the last sample has identical values — this
+      // prevents chart glitching/thrashing when brokers send repeated
+      // messages with unchanged numeric payloads.
+      const last = prev[prev.length - 1];
+      if (last) {
+        let same = true;
+        for (const key of Object.keys(sample)) {
+          if (key === 'time') continue;
+          if (last[key] !== sample[key]) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return prev;
+      }
       const next = [...prev, sample];
       return next.length > 100 ? next.slice(-100) : next;
     });
@@ -361,9 +377,13 @@ export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500">Host</span>
-              <span className="font-mono text-slate-300 truncate max-w-[140px]">
-                {config.host}:{config.port}
+              <span className="font-mono text-slate-300 truncate max-w-[140px]" title={config.host}>
+                {config.host}
               </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500">Port</span>
+              <span className="font-mono text-slate-300">{config.port}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500">Protocol</span>
@@ -371,7 +391,7 @@ export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500">Client ID</span>
-              <span className="font-mono text-slate-300 truncate max-w-[140px]">
+              <span className="font-mono text-slate-300 truncate max-w-[140px]" title={config.clientId}>
                 {config.clientId}
               </span>
             </div>
@@ -476,10 +496,25 @@ export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps
                 visibleSeries.map((s) => (
                   <span
                     key={s.dataKey}
-                    className="px-1.5 py-0.5 rounded text-[9px] font-mono border transition-colors bg-cyan-500/15 text-cyan-300"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border transition-colors bg-cyan-500/15 text-cyan-300"
                     style={{ borderColor: s.color + '80' }}
                   >
                     {s.label}
+                    {onToggleTelemetryKey && (
+                      <button
+                        onClick={() => {
+                          // The selectedTelemetryKeys set stores bare keys (e.g. "temp"),
+                          // not the full dataKey path. Use the last label segment so the
+                          // removal matches what PayloadViewer toggled on.
+                          const bareKey = s.label.split('.').pop() ?? s.dataKey;
+                          onToggleTelemetryKey(bareKey);
+                        }}
+                        className="text-cyan-400/70 hover:text-red-400 transition-colors"
+                        title={`Remove ${s.label} from trends`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    )}
                   </span>
                 ))
               ) : (
@@ -543,14 +578,30 @@ export function HealthPanel({ session, selectedTelemetryKeys }: HealthPanelProps
             {config.subscriptions.length === 0 ? (
               <div className="text-[10px] text-slate-600">No subscriptions configured…</div>
             ) : (
-              config.subscriptions.map((sub, i) => (
-                <div key={i} className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-[10px] text-cyan-400 truncate">{sub.pattern}</span>
-                  <span className="text-[9px] px-1 py-px rounded bg-slate-800 text-slate-500 shrink-0">
-                    QoS {sub.qos}
+              config.subscriptions.map((sub, i) => {
+                const statusIcon = sub.status === 'subscribed' ? (
+                  <span title="Subscribed">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
                   </span>
-                </div>
-              ))
+                ) : sub.status === 'error' ? (
+                  <span title={`Error: ${sub.errorMessage || 'Unknown'}`}>
+                    <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                  </span>
+                ) : (
+                  <span className="w-3 h-3 rounded-full bg-slate-700 shrink-0" title="Pending" />
+                );
+                return (
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {statusIcon}
+                      <span className="font-mono text-[10px] text-cyan-400 truncate">{sub.pattern}</span>
+                    </div>
+                    <span className="text-[9px] px-1 py-px rounded bg-slate-800 text-slate-500 shrink-0">
+                      QoS {sub.qos}
+                    </span>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

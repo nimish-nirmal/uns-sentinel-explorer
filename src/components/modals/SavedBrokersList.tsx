@@ -2,14 +2,16 @@
  * Saved Brokers List Window — card list of stored setups with one-click
  * "Launch Session", edit, delete, plus workspace import/export.
  */
-import { useRef, useState } from 'react';
-import { X, Rocket, Pencil, Trash2, Download, Upload, Wifi, WifiOff } from 'lucide-react';
-import type { BrokerConfig, SavedBroker } from '../../types';
+import { useMemo, useRef, useState } from 'react';
+import { X, Rocket, Pencil, Trash2, Download, Upload, Wifi, WifiOff, Activity } from 'lucide-react';
+import type { BrokerConfig, SavedBroker, Session } from '../../types';
 import { exportWorkspace, importWorkspace } from '../../lib/storage';
 
 interface SavedBrokersListProps {
   open: boolean;
   brokers: SavedBroker[];
+  /** Currently active sessions — used to mark which brokers are connected */
+  activeSessions?: Session[];
   onClose: () => void;
   onLaunch: (config: BrokerConfig) => void;
   onEdit: (broker: SavedBroker) => void;
@@ -20,6 +22,7 @@ interface SavedBrokersListProps {
 export function SavedBrokersList({
   open,
   brokers,
+  activeSessions = [],
   onClose,
   onLaunch,
   onEdit,
@@ -28,6 +31,20 @@ export function SavedBrokersList({
 }: SavedBrokersListProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
+
+  // Map of broker id -> active session (connected or connecting) using
+  // the session's config.id. Default brokers launched from this list
+  // keep the same id, so we can match them to their active sessions.
+  const activeSessionByBroker = useMemo(() => {
+    const map = new Map<string, Session>();
+    for (const s of activeSessions ?? []) {
+      if (s.config.id && (s.status === 'connected' || s.status === 'connecting')) {
+        map.set(s.config.id, s);
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessions]);
 
   if (!open) return null;
 
@@ -92,19 +109,49 @@ export function SavedBrokersList({
             </div>
           ) : (
             <div className="space-y-2">
-              {brokers.map((broker) => (
+              {brokers.map((broker) => {
+                const activeSession = activeSessionByBroker.get(broker.id);
+                const isActive = !!activeSession;
+                return (
                 <div
                   key={broker.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-base-950 border border-slate-800 hover:border-slate-700 transition-colors"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-md bg-base-950 border transition-colors ${
+                    isActive
+                      ? 'border-emerald-500/50 hover:border-emerald-500/70'
+                      : 'border-slate-800 hover:border-slate-700'
+                  }`}
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-slate-800/80 shrink-0">
-                    <Wifi className="w-4 h-4 text-cyan-400" />
+                    {isActive ? (
+                      <Activity className={`w-4 h-4 text-emerald-400 ${activeSession!.status === 'connecting' ? 'animate-pulse' : ''}`} />
+                    ) : (
+                      <Wifi className="w-4 h-4 text-cyan-400" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-slate-200 truncate">{broker.name}</span>
+                      {isActive && (
+                        <span className="text-[9px] px-1 py-0.5 rounded font-mono uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shrink-0">
+                          {activeSession!.status === 'connecting' ? 'connecting' : 'live'}
+                        </span>
+                      )}
                       <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono uppercase">
                         {broker.protocol}
+                      </span>
+                      <span
+                        className={`text-[9px] px-1 py-0.5 rounded font-mono uppercase ${
+                          broker.connectionMode === 'browser'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        }`}
+                        title={
+                          broker.connectionMode === 'browser'
+                            ? 'Direct Browser connection (works on static hosting)'
+                            : 'Backend Gateway connection (requires the Node.js server)'
+                        }
+                      >
+                        {broker.connectionMode === 'browser' ? 'browser' : 'gateway'}
                       </span>
                     </div>
                     <div className="text-xs text-slate-500 truncate">
@@ -140,7 +187,8 @@ export function SavedBrokersList({
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

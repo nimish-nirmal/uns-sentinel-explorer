@@ -25,6 +25,8 @@ interface PayloadViewerProps {
   onPublishTopic: (topic: string) => void;
   selectedKeys: Set<string>;
   onToggleKey: (key: string) => void;
+  /** Pass dark mode state so Monaco can use the correct editor theme */
+  darkMode?: boolean;
 }
 
 interface TelemetrySample {
@@ -91,7 +93,7 @@ function toText(value: any): string {
     .join('\n');
 }
 
-export function PayloadViewer({ selectedNode, onPublishTopic, selectedKeys, onToggleKey }: PayloadViewerProps) {
+export function PayloadViewer({ selectedNode, onPublishTopic, selectedKeys, onToggleKey, darkMode = true }: PayloadViewerProps) {
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetrySample[]>([]);
   const [diffFormat, setDiffFormat] = useState<DiffFormat>('json');
 
@@ -215,7 +217,7 @@ export function PayloadViewer({ selectedNode, onPublishTopic, selectedKeys, onTo
             {selectedNode.previousPayload === undefined ? (
               <Editor
                 height="100%"
-                theme="vs-dark"
+                theme={darkMode ? 'vs-dark' : 'light'}
                 language={editorLanguage}
                 value={diffEditorContent}
                 options={{
@@ -250,7 +252,7 @@ export function PayloadViewer({ selectedNode, onPublishTopic, selectedKeys, onTo
             ) : (
               <DiffEditor
                 height="100%"
-                theme="vs-dark"
+                theme={darkMode ? 'vs-dark' : 'light'}
                 language={editorLanguage}
                 original={originalContent}
                 modified={diffEditorContent}

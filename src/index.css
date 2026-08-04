@@ -6,6 +6,12 @@
   html {
     @apply bg-slate-950 text-slate-200 antialiased;
   }
+  html.dark {
+    @apply bg-slate-950 text-slate-200;
+  }
+  html:not(.dark) {
+    @apply bg-slate-50 text-slate-900;
+  }
   body {
     @apply m-0 h-screen overflow-hidden;
   }
@@ -36,8 +42,14 @@
   .panel {
     @apply bg-base-900/80 border border-slate-800 rounded-lg backdrop-blur-sm;
   }
+  html:not(.dark) .panel {
+    @apply bg-white border-slate-200;
+  }
   .panel-header {
     @apply flex items-center justify-between px-3 py-2 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400;
+  }
+  html:not(.dark) .panel-header {
+    @apply border-slate-200 text-slate-600;
   }
   .btn {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:opacity-50 disabled:cursor-not-allowed;
@@ -54,7 +66,80 @@
   .input {
     @apply w-full px-3 py-2 rounded-md bg-base-950 border border-slate-700 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-colors;
   }
+  html:not(.dark) .input {
+    @apply bg-white border-slate-300 text-slate-900 placeholder-slate-400;
+  }
   .label {
     @apply block text-xs font-medium text-slate-400 mb-1;
   }
+  html:not(.dark) .label {
+    @apply text-slate-600;
+  }
 }
+
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   The app components use hardcoded dark utility classes (bg-slate-950,
+   text-slate-200, bg-base-900, border-slate-800, etc.). When the user
+   switches to light mode (html:not(.dark)), we override these classes
+   so the ENTIRE UI turns white/light — not just a few cards.
+   ============================================================ */
+html:not(.dark) .bg-slate-950 { background-color: #f8fafc; }
+html:not(.dark) .bg-base-900 { background-color: #ffffff; }
+html:not(.dark) .bg-base-900\/80 { background-color: rgba(255, 255, 255, 0.9); }
+html:not(.dark) .bg-base-950 { background-color: #ffffff; }
+html:not(.dark) .bg-base-850 { background-color: #f1f5f9; }
+html:not(.dark) .bg-base-800 { background-color: #e2e8f0; }
+html:not(.dark) .bg-slate-800 { background-color: #e2e8f0; }
+html:not(.dark) .bg-slate-800\/80 { background-color: rgba(226, 232, 240, 0.8); }
+html:not(.dark) .bg-slate-700 { background-color: #cbd5e1; }
+html:not(.dark) .bg-slate-900 { background-color: #f1f5f9; }
+
+html:not(.dark) .text-slate-100 { color: #0f172a; }
+html:not(.dark) .text-slate-200 { color: #1e293b; }
+html:not(.dark) .text-slate-300 { color: #334155; }
+html:not(.dark) .text-slate-400 { color: #64748b; }
+html:not(.dark) .text-slate-500 { color: #64748b; }
+html:not(.dark) .text-slate-600 { color: #475569; }
+html:not(.dark) .text-slate-700 { color: #334155; }
+html:not(.dark) .text-slate-900 { color: #0f172a; }
+
+/* Accent colors — bright 400-series are unreadable on white, darken them */
+html:not(.dark) .text-cyan-400 { color: #0891b2; }
+html:not(.dark) .text-emerald-400 { color: #059669; }
+html:not(.dark) .text-amber-400 { color: #d97706; }
+html:not(.dark) .text-fuchsia-400 { color: #c026d3; }
+html:not(.dark) .text-red-400 { color: #dc2626; }
+html:not(.dark) .text-cyan-300 { color: #0e7490; }
+html:not(.dark) .text-emerald-300 { color: #047857; }
+html:not(.dark) .text-amber-300 { color: #b45309; }
+
+html:not(.dark) .border-slate-800 { border-color: #e2e8f0; }
+html:not(.dark) .border-slate-700 { border-color: #cbd5e1; }
+html:not(.dark) .border-slate-600 { border-color: #94a3b8; }
+
+/* Hover variants — keep light-mode hovers light */
+html:not(.dark) .hover\:bg-slate-800:hover { background-color: #f1f5f9; }
+html:not(.dark) .hover\:bg-slate-800\/60:hover { background-color: rgba(241, 245, 249, 0.6); }
+html:not(.dark) .hover\:bg-slate-800\/80:hover { background-color: rgba(226, 232, 240, 0.8); }
+html:not(.dark) .hover\:bg-slate-700:hover { background-color: #e2e8f0; }
+
+/* Tree node selected + matched states readable on white */
+html:not(.dark) .bg-cyan-500\/10 { background-color: rgba(8, 145, 178, 0.08); }
+html:not(.dark) .bg-cyan-500\/20 { background-color: rgba(8, 145, 178, 0.15); }
+html:not(.dark) .bg-amber-500\/5 { background-color: rgba(217, 119, 6, 0.06); }
+html:not(.dark) .text-cyan-300 { color: #0e7490; }
+html:not(.dark) .text-emerald-500\/40 { color: #059669; }
+html:not(.dark) .bg-emerald-500\/40 { background-color: rgba(5, 150, 105, 0.25); }
+html:not(.dark) .bg-emerald-500\/15 { background-color: rgba(5, 150, 105, 0.12); }
+html:not(.dark) .bg-cyan-500\/15 { background-color: rgba(8, 145, 178, 0.12); }
+html:not(.dark) .bg-amber-500\/15 { background-color: rgba(217, 119, 6, 0.12); }
+html:not(.dark) .bg-amber-500\/10 { background-color: rgba(217, 119, 6, 0.1); }
+html:not(.dark) .bg-red-500\/10 { background-color: rgba(220, 38, 38, 0.1); }
+html:not(.dark) .bg-emerald-500\/10 { background-color: rgba(5, 150, 105, 0.1); }
+
+html:not(.dark) .btn-ghost { color: #64748b; }
+html:not(.dark) .btn-ghost:hover { background-color: #f1f5f9; color: #1e293b; }
+
+html:not(.dark) .rounded-md.bg-base-950 { background-color: #ffffff; }
+html:not(.dark) .rounded-md.bg-base-950.border-slate-800 { border-color: #e2e8f0; }
