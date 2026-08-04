@@ -313,6 +313,18 @@
 
 > **Note on Permissions-Policy warnings**: The `Permissions-Policy` console warnings (e.g. `Unrecognized feature: 'private-state-token-redemption'`, `'browsing-topics'`, etc.) are **not caused by this application**. They come from GitHub Pages' default response headers and are harmless browser noise. They cannot be fixed from the app side.
 
+### 38. ✅ ISA-95 Topic Detection (Structural + TOPIC_PREFIX)
+**Problem**: ISA-95 topics were only detected if the first segment matched a keyword like `enterprise`/`site`. Real ISA-95 topics from the `unified-namespace-schemas` repo use **arbitrary enterprise names** as the first segment (e.g. `Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/asset`), so they were misclassified as `legacy`.
+**Solution**: 
+- `classifyTopicPath()` now uses **structural detection** — matches the standard ISA-95 hierarchy `{enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}`
+- Recognizes ISA-95 message types: `asset`, `state`, `edge`, `alert` (including `edge/{sensorName}`)
+- **TOPIC_PREFIX support**: The `unified-namespace-schemas` repo allows an optional prefix before enterprise: `{TOPIC_PREFIX}/{enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}`. Because detection is based on the **end** of the topic (message types), a prefix like `UnifiedNamespace/` does NOT affect classification.
+- Falls back to the keyword heuristic for demo topics like `Enterprise/Site1/Area1/...`
+- Simulator now emits proper ISA-95 topics with prefix: `UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/{asset,state,edge,alert}`
+- Default broker subscriptions updated to `UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#`
+**Files**: `src/engine/topicTree.ts`, `src/engine/simulator.ts`, `src/lib/storage.ts`, `src/components/modals/BrokerConfigModal.tsx`, `src/engine/mqttEngine.ts`
+**Status**: Fixed
+
 ---
 
 ## Current Architecture
@@ -350,7 +362,7 @@ flowchart LR
 | 8 | Eclipse Public Broker (TCP) | mqtt.eclipseprojects.io | 1883 | mqtt | gateway |
 
 All default brokers subscribe to:
-- `Enterprise/Site1/Area1/Line1/Cell1/#`
+- `UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#` (ISA-95 with TOPIC_PREFIX)
 - `legacy/sensors/+/temp`
 - `$SYS/#`
 

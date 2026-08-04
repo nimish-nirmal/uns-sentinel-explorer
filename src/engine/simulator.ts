@@ -79,7 +79,51 @@ function buildMessages(state: SimState): SimulatedMessage[] {
   const msgs: SimulatedMessage[] = [];
   const now = new Date().toISOString();
 
-  // ISA-95 structured telemetry — Cell1 machine states
+  // ISA-95 structured telemetry — follows the standard hierarchy from the
+  // `unified-namespace-schemas` repo:
+  //   {TOPIC_PREFIX}/{enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}
+  // where messageType ∈ { asset, state, edge, alert }.
+  // The TOPIC_PREFIX is optional — it can be a company/namespace name.
+  const TOPIC_PREFIX = 'UnifiedNamespace';
+  const ENTERPRISE = 'Plant';
+  const SITE = 'Plant-01';
+  const AREA = 'Utilities';
+  const LINE = 'CoolingSystem';
+  const CELL = 'PumpStation-A';
+  const ASSET = 'PUMP-101';
+  const base = `${TOPIC_PREFIX}/${ENTERPRISE}/${SITE}/${AREA}/${LINE}/${CELL}/${ASSET}`;
+
+  // Asset birth certificate (retained)
+  msgs.push({
+    topic: `${base}/asset`,
+    payload: JSON.stringify({
+      ts: now,
+      assetId: ASSET,
+      name: 'Primary Cooling Water Pump 1',
+      type: 'CentrifugalPump',
+      manufacturer: 'Grundfos',
+      model: 'CR45-4',
+      location: 'Building A - Bay 2',
+    }),
+    retain: true,
+    qos: 0,
+  });
+
+  // Operational state (non-retained)
+  msgs.push({
+    topic: `${base}/state`,
+    payload: JSON.stringify({
+      ts: now,
+      assetId: ASSET,
+      state: state.tick % 20 === 0 ? 'STARTING' : 'RUNNING',
+      previousState: 'RUNNING',
+      trigger: 'auto',
+    }),
+    retain: false,
+    qos: 0,
+  });
+
+  // Edge telemetry — per-sensor readings under .../edge/{sensorName}
   for (const sensor of DEMO_SENSORS) {
     const idx = DEMO_SENSORS.indexOf(sensor);
     const baseTemp = 65 + idx * 4;
@@ -87,7 +131,7 @@ function buildMessages(state: SimState): SimulatedMessage[] {
     state.sensorTemps[sensor] = temp;
 
     msgs.push({
-      topic: `Enterprise/Site1/Area1/Line1/Cell1/Machine/Temperature`,
+      topic: `${base}/edge/temperature`,
       payload: JSON.stringify({
         ts: now,
         sensorId: sensor,
@@ -105,7 +149,7 @@ function buildMessages(state: SimState): SimulatedMessage[] {
     state.sensorPressures[sensor] = pressure;
 
     msgs.push({
-      topic: `Enterprise/Site1/Area1/Line1/Cell1/Machine/Pressure`,
+      topic: `${base}/edge/pressure`,
       payload: JSON.stringify({
         ts: now,
         sensorId: sensor,
@@ -114,6 +158,23 @@ function buildMessages(state: SimState): SimulatedMessage[] {
         quality: randomQuality(),
       }),
       retain: true,
+      qos: 0,
+    });
+  }
+
+  // Alert notification (non-retained, only when a sensor is hot)
+  const hottest = Math.max(...Object.values(state.sensorTemps).filter((v) => v !== undefined));
+  if (hottest > 85) {
+    msgs.push({
+      topic: `${base}/alert`,
+      payload: JSON.stringify({
+        ts: now,
+        assetId: ASSET,
+        severity: 'WARNING',
+        code: 'OVERHEAT_001',
+        message: `Temperature exceeded threshold: ${round(hottest, 1)}°C`,
+      }),
+      retain: false,
       qos: 0,
     });
   }

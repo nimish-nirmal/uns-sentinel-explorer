@@ -4,7 +4,20 @@
  */
 import type { UNSTreeNode, TreeNodeType } from '../types';
 
+/**
+ * ISA-95 level keywords — used as a fallback heuristic when the topic
+ * structure doesn't match the standard `{enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}`
+ * pattern (e.g. when the enterprise name is not a known keyword).
+ */
 const ISA95_LEVELS = ['enterprise', 'site', 'area', 'line', 'cell', 'unit', 'equipment'] as const;
+
+/**
+ * ISA-95 message types — the final segment(s) of a well-formed ISA-95 topic.
+ * From the `unified-namespace-schemas` repo:
+ *   {enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}
+ * where messageType ∈ { asset, state, edge, alert }.
+ */
+const ISA95_MESSAGE_TYPES = new Set(['asset', 'state', 'edge', 'alert']);
 
 /** Deep clone a tree node (needed for React state updates) */
 export function cloneTree(node: UNSTreeNode): UNSTreeNode {
@@ -16,13 +29,57 @@ export function cloneTree(node: UNSTreeNode): UNSTreeNode {
   };
 }
 
-/** Classify a topic path segment/level to determine ISA-95 vs legacy vs $SYS */
+/**
+ * Classify a topic path to determine ISA-95 vs legacy vs $SYS.
+ *
+ * Detection strategy (in priority order):
+ * 1. `$SYS/...` → sys
+ * 2. `legacy/...` → legacy
+ * 3. **Structural ISA-95 detection** — matches the standard ISA-95 hierarchy
+ *    `{enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}`:
+ *    - The topic has ≥ 4 segments (enterprise/site/area/line minimum)
+ *    - The last segment (or second-to-last for `edge/{sensor}`) is a known
+ *      ISA-95 message type: `asset`, `state`, `edge`, `alert`
+ *    - The first segment is NOT `legacy` or `$SYS` (already handled above)
+ *    - **Prefix support**: The `unified-namespace-schemas` repo allows an
+ *      optional `TOPIC_PREFIX` before the enterprise level:
+ *        `{TOPIC_PREFIX}/{enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}`
+ *      e.g. `UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PUMP-101/asset`
+ *      Because detection is based on the **end** of the topic (message types),
+ *      a prefix before enterprise does NOT affect classification.
+ * 4. **Keyword heuristic** — first segment matches an ISA-95 level name
+ *    (e.g. `Enterprise/Site1/Area1/...` from the demo simulator)
+ * 5. Fallback → legacy
+ */
 export function classifyTopicPath(path: string): TreeNodeType {
   if (path.startsWith('$SYS')) return 'sys';
-  const first = path.split('/')[0]?.toLowerCase();
+
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length === 0) return 'legacy';
+
+  const first = segments[0].toLowerCase();
   if (first === 'legacy') return 'legacy';
-  // Heuristic: if the first segment matches an ISA-95 level name, treat as ISA-95
+
+  // Structural ISA-95 detection: {enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}
+  // Requires at least 4 segments (enterprise/site/area/line) and a known message type.
+  // NOTE: This works regardless of whether a TOPIC_PREFIX precedes the enterprise
+  // level — we only inspect the LAST segments for message types.
+  if (segments.length >= 4) {
+    const last = segments[segments.length - 1].toLowerCase();
+    const secondLast = segments[segments.length - 2]?.toLowerCase();
+
+    // Direct message type: .../asset, .../state, .../alert
+    if (ISA95_MESSAGE_TYPES.has(last)) return 'isa95';
+
+    // Edge telemetry: .../edge/{sensorName} (e.g. .../edge/temperature)
+    if (secondLast === 'edge') return 'isa95';
+  }
+
+  // Keyword heuristic: first segment matches an ISA-95 level name.
+  // Note: with a TOPIC_PREFIX, the first segment is the prefix (e.g. `UnifiedNamespace`),
+  // so this heuristic won't match — but the structural detection above already handles it.
   if ((ISA95_LEVELS as readonly string[]).includes(first)) return 'isa95';
+
   return 'legacy';
 }
 

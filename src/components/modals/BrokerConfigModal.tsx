@@ -14,7 +14,7 @@ interface BrokerConfigModalProps {
   onConnect: (config: BrokerConfig, save: boolean) => void;
 }
 
-const DEFAULT_TOPICS = ['Enterprise/Site1/Area1/Line1/Cell1/#', 'legacy/sensors/+/temp', '$SYS/#'];
+const DEFAULT_TOPICS = ['UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#', 'legacy/sensors/+/temp', '$SYS/#'];
 const DEFAULT_PORTS = {
   mqtt: 1883,   // Standard MQTT port
   mqtts: 8883,  // Secure MQTT port
@@ -624,7 +624,7 @@ export function BrokerConfigModal({ open, initial, onClose, onConnect }: BrokerC
                 className="input font-mono text-xs flex-1 min-h-[320px] resize-y leading-relaxed"
                 value={topicsText}
                 onChange={(e) => setTopicsText(e.target.value)}
-                placeholder={'Enterprise/Site1/Area1/Line1/Cell1/#\nlegacy/sensors/+/temp\n$SYS/#'}
+                placeholder={'UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#\nlegacy/sensors/+/temp\n$SYS/#'}
                 spellCheck={false}
               />
             </div>

@@ -162,9 +162,15 @@ function isValidBroker(b: any): b is SavedBroker {
   );
 }
 
-/** Default UNS subscription patterns used by all default brokers */
+/**
+ * Default UNS subscription patterns used by all default brokers.
+ * The ISA-95 pattern follows the standard hierarchy from the
+ * `unified-namespace-schemas` repo:
+ *   {enterprise}/{site}/{area}/{line}/{cell}/{asset}/{messageType}
+ * The `#` wildcard captures all message types (asset, state, edge, alert).
+ */
 const DEFAULT_UNS_TOPICS: TopicSubscription[] = [
-  { pattern: 'Enterprise/Site1/Area1/Line1/Cell1/#', qos: 0 },
+  { pattern: 'UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#', qos: 0 },
   { pattern: 'legacy/sensors/+/temp', qos: 0 },
   { pattern: '$SYS/#', qos: 0 },
 ];

@@ -922,7 +922,7 @@ export function getReadableError(error: string): string {
 
 /** Default demo topics for the simulator */
 export const DEFAULT_DEMO_TOPICS: TopicSubscription[] = [
-  { pattern: 'Enterprise/Site1/Area1/Line1/Cell1/#', qos: 0 },
+  { pattern: 'UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#', qos: 0 },
   { pattern: 'legacy/sensors/+/temp', qos: 0 },
   { pattern: 'legacy/sensors/+/pressure', qos: 0 },
   { pattern: '$SYS/#', qos: 0 },

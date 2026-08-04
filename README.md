@@ -87,7 +87,7 @@ Manage multiple simultaneous MQTT broker connections, each in its own tab:
 - **Protocol badge** — `WSS` (secure) or `WS` (plain)
 - **Multi-topic subscription rules** — subscribe to wildcard patterns concurrently:
   ```
-  Enterprise/Site1/Area1/Line1/Cell1/#
+  UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#
   legacy/sensors/+/temp
   $SYS/#
   ```
@@ -98,7 +98,7 @@ Auto-builds a hierarchical tree by parsing topic strings on `/`:
 
 | Node Type | Example | Color | Icon |
 | --------- | ------- | ----- | ---- |
-| **ISA-95** | `Enterprise/Site1/Area1/Line1/Cell1` | 🩵 Cyan | 🏢 |
+| **ISA-95** | `UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A` | 🩵 Cyan | 🏢 |
 | **Legacy** | `legacy/sensors/sensor-01/temp` | 🟢 Emerald | 📦 |
 | **$SYS** | `$SYS/broker/uptime` | 🟡 Amber | ⚙️ |
 
