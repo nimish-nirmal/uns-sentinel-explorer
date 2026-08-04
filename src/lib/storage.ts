@@ -170,7 +170,7 @@ function isValidBroker(b: any): b is SavedBroker {
  * The `#` wildcard captures all message types (asset, state, edge, alert).
  */
 const DEFAULT_UNS_TOPICS: TopicSubscription[] = [
-  { pattern: 'UnifiedNamespace/Plant/Plant-01/Utilities/CoolingSystem/PumpStation-A/PUMP-101/#', qos: 0 },
+  { pattern: 'enterprise/site/area/line/cell/asset/messageType/#', qos: 0 },
   { pattern: 'legacy/sensors/+/temp', qos: 0 },
   { pattern: '$SYS/#', qos: 0 },
 ];
