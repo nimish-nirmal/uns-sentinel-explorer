@@ -73,6 +73,7 @@
 - [🛠️ Tech Stack](#️-tech-stack)
 - [📦 CI/CD & GitHub Pages](#-cicd--github-pages)
 - [🐳 Docker](#-docker)
+- [🖼️ Screenshots](#-screenshots)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
