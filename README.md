@@ -73,7 +73,7 @@
 - [🛠️ Tech Stack](#️-tech-stack)
 - [📦 CI/CD & GitHub Pages](#-cicd--github-pages)
 - [🐳 Docker](#-docker)
-- [🖼️ Screenshots](#-screenshots)
+- [📷 Screenshots](#-screenshots)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
@@ -492,7 +492,7 @@ docker run -p 4000:4000 -p 3000:3000 uns-sentinel-explorer
 
 ---
 
-## 🖼️ Screenshots
+## 📷 Screenshots
 
 **Live Preview Dark :**
 
