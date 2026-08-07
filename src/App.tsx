@@ -32,6 +32,7 @@ export default function App() {
   const [gatewayConnected, setGatewayConnected] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
+  const [splashProgress, setSplashProgress] = useState(0);
 
   const engineRef = useRef<MqttEngine | null>(null);
   const simControlRef = useRef<SimulatorControl | null>(null);
@@ -44,8 +45,8 @@ export default function App() {
   const gatewayModeUsedRef = useRef(false);
 
   const applyMessageBatch = useCallback((sessionId: string, batch: MessageBatch[]) => {
-    setSessions((prev) =>
-      prev.map((session) => {
+    setSessions((prev) => {
+      const updated = prev.map((session) => {
         if (session.config.id !== sessionId) return session;
         const now = Date.now();
         // Clone the tree before updating to ensure React detects the change
@@ -56,13 +57,17 @@ export default function App() {
         }
         // Return new session object with cloned tree
         return { ...session, tree: updatedTree };
-      })
-    );
-    setSelectedNode((prev) => {
-      if (!prev) return prev;
-      const session = sessions.find((s) => s.config.id === sessionId);
-      if (!session) return prev;
-      return findNodeByPath(session.tree, prev.path) ?? prev;
+      });
+      
+      // Update selected node if it belongs to this session
+      setSelectedNode((prevNode) => {
+        if (!prevNode) return prevNode;
+        const updatedSession = updated.find((s) => s.config.id === sessionId);
+        if (!updatedSession) return prevNode;
+        return findNodeByPath(updatedSession.tree, prevNode.path) ?? prevNode;
+      });
+      
+      return updated;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -283,15 +288,40 @@ export default function App() {
     toggleSimulatorRef.current = toggleSimulator;
   }, [toggleSimulator]);
 
-  // Splash screen: show project description for 5 seconds, then
-  // auto-open the Saved Brokers list so the user can pick a broker.
+  // Splash screen: show project description for 5 seconds with animated progress bar
   useEffect(() => {
     if (!showSplash) return;
-    const timer = setTimeout(() => {
+
+    // Generate random progress increments over 5 seconds
+    const increments = [
+      Math.floor(Math.random() * 30) + 10,  // 10-40%
+      Math.floor(Math.random() * 30) + 30,  // 30-60%
+      Math.floor(Math.random() * 30) + 50,  // 50-80%
+      100,  // Complete
+    ];
+
+    const timers: NodeJS.Timeout[] = [];
+    const interval = 1200; // ~1.2 seconds between increments
+
+    increments.forEach((target, index) => {
+      const timer = setTimeout(() => {
+        setSplashProgress(target);
+      }, (index + 1) * interval);
+      timers.push(timer);
+    });
+
+    // Close splash after all increments
+    const closeTimer = setTimeout(() => {
       setShowSplash(false);
       setShowSavedBrokers(true);
+      setSplashProgress(0);
     }, 5000);
-    return () => clearTimeout(timer);
+
+    timers.push(closeTimer);
+
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, [showSplash]);
 
   const handleTogglePause = useCallback(() => {
@@ -535,8 +565,6 @@ export default function App() {
         <div className="w-[25%] min-w-[200px]">
           <HealthPanel
             session={activeSession}
-            selectedTelemetryKeys={selectedTelemetryKeys}
-            onToggleTelemetryKey={handleToggleTelemetryKey}
           />
         </div>
       </div>
@@ -583,7 +611,7 @@ export default function App() {
               </span>
               <span className="text-[10px] text-slate-500">by Nimish Nirmal</span>
             </div>
-            <div className="p-5 space-y-3">
+            <div className="p-5 space-y-4">
               <p className="text-sm text-slate-300 leading-relaxed">
                 <strong className="text-cyan-400">UNS Sentinel Explorer</strong> is a real-time
                 monitoring tool for <strong className="text-slate-200">ISA-95 / UNS (Unified Namespace)</strong>{' '}
@@ -596,9 +624,18 @@ export default function App() {
                 <div>• Monitor throughput, health KPIs & telemetry trends</div>
                 <div>• Publish messages & diff payload changes</div>
               </div>
-              <p className="text-xs text-slate-500">
-                Opening the broker list…
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400 flex items-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
+                  Opening the broker list…
+                </p>
+                <div className="h-1.5 bg-base-950 rounded-full overflow-hidden border border-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${splashProgress}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
