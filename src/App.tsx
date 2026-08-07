@@ -565,9 +565,6 @@ export default function App() {
         <div className="w-[25%] min-w-[200px]">
           <HealthPanel
             session={activeSession}
-            selectedTelemetryKeys={selectedTelemetryKeys}
-            onToggleTelemetryKey={handleToggleTelemetryKey}
-            selectedNodePath={selectedNode?.path ?? null}
           />
         </div>
       </div>
